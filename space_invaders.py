@@ -8,6 +8,8 @@ A curses-based Space Invaders game with ASCII art
 import curses
 import time
 import random
+import json
+import os
 from enum import IntEnum
 
 class GameState(IntEnum):
@@ -16,6 +18,7 @@ class GameState(IntEnum):
     EXPLODE = 3
     WAIT = 4
     GAMEOVER = 5
+    PAUSED = 6
 
 # ASCII Sprites
 SPRITES = {
@@ -118,6 +121,7 @@ class Game:
         self.level = 1
         self.state = GameState.INTRO
         self.frame = 0
+        self.save_file = 'space_invaders_save.json'
         
         # Game objects
         self.gunner = Gunner(self.width // 2)
@@ -183,6 +187,117 @@ class Game:
         self.gunner.exploding = False
         self.alien_direction = 1
     
+    def save_game(self):
+        """Save game state to JSON file"""
+        if self.state not in [GameState.PLAY, GameState.PAUSED]:
+            return False
+        
+        save_data = {
+            'score': self.score,
+            'level': self.level,
+            'frame': self.frame,
+            'gunner': {
+                'x': self.gunner.x,
+                'lives': self.gunner.lives,
+                'exploding': self.gunner.exploding,
+                'explode_counter': self.gunner.explode_counter
+            },
+            'aliens': [{
+                'type': a.type,
+                'x': a.x,
+                'y': a.y,
+                'frame': a.frame,
+                'alive': a.alive,
+                'explode_counter': a.explode_counter
+            } for a in self.aliens],
+            'shelters': [{
+                'x': s.x,
+                'y': s.y,
+                'health': s.health
+            } for s in self.shelters],
+            'bullets': [{
+                'x': b.x,
+                'y': b.y,
+                'active': b.active
+            } for b in self.bullets],
+            'bombs': [{
+                'x': b.x,
+                'y': b.y,
+                'anim': b.anim,
+                'active': b.active
+            } for b in self.bombs],
+            'alien_direction': self.alien_direction,
+            'mystery_active': self.mystery_active,
+            'mystery_ship': self.mystery_ship
+        }
+        
+        try:
+            with open(self.save_file, 'w') as f:
+                json.dump(save_data, f, indent=2)
+            return True
+        except Exception as e:
+            return False
+    
+    def load_game(self):
+        """Load game state from JSON file"""
+        if not os.path.exists(self.save_file):
+            return False
+        
+        try:
+            with open(self.save_file, 'r') as f:
+                save_data = json.load(f)
+            
+            self.score = save_data['score']
+            self.level = save_data['level']
+            self.frame = save_data['frame']
+            
+            # Restore gunner
+            g = save_data['gunner']
+            self.gunner.x = g['x']
+            self.gunner.lives = g['lives']
+            self.gunner.exploding = g['exploding']
+            self.gunner.explode_counter = g['explode_counter']
+            
+            # Restore aliens
+            self.aliens = []
+            for a_data in save_data['aliens']:
+                alien = Alien(a_data['type'], a_data['x'], a_data['y'])
+                alien.frame = a_data['frame']
+                alien.alive = a_data['alive']
+                alien.explode_counter = a_data['explode_counter']
+                self.aliens.append(alien)
+            
+            # Restore shelters
+            self.shelters = []
+            for s_data in save_data['shelters']:
+                shelter = Shelter(s_data['x'], s_data['y'])
+                shelter.health = s_data['health']
+                self.shelters.append(shelter)
+            
+            # Restore bullets
+            self.bullets = []
+            for b_data in save_data['bullets']:
+                bullet = Bullet(b_data['x'], b_data['y'])
+                bullet.active = b_data['active']
+                self.bullets.append(bullet)
+            
+            # Restore bombs
+            self.bombs = []
+            for b_data in save_data['bombs']:
+                bomb = Bomb(b_data['x'], b_data['y'])
+                bomb.anim = b_data['anim']
+                bomb.active = b_data['active']
+                self.bombs.append(bomb)
+            
+            self.alien_direction = save_data['alien_direction']
+            self.mystery_active = save_data['mystery_active']
+            self.mystery_ship = save_data['mystery_ship']
+            
+            self.state = GameState.PLAY
+            return True
+        except Exception as e:
+            return False
+    
     def draw_sprite(self, sprite, x, y, color=1):
         """Draw an ASCII sprite at position"""
         try:
@@ -197,7 +312,8 @@ class Game:
         self.stdscr.clear()
         title = "ASCII SPACE INVADERS"
         subtitle = "Press SPACE to start"
-        controls = ["Controls:", "A/D or Left/Right - Move", "SPACE - Fire", "Q - Quit"]
+        load_text = "Press L to load saved game"
+        controls = ["Controls:", "A/D or Arrow Keys - Move", "SPACE - Fire", "P - Pause", "Q - Quit"]
         
         try:
             y = self.height // 2 - 5
@@ -210,8 +326,42 @@ class Game:
             
             self.stdscr.addstr(y + 6, (self.width - len(subtitle)) // 2, subtitle, curses.color_pair(5))
             
+            if os.path.exists(self.save_file):
+                self.stdscr.addstr(y + 7, (self.width - len(load_text)) // 2, load_text, curses.color_pair(3))
+            
             for i, control in enumerate(controls):
                 self.stdscr.addstr(y + 9 + i, (self.width - len(control)) // 2, control, curses.color_pair(5))
+        except curses.error:
+            pass
+    
+    def draw_paused(self):
+        """Draw pause overlay"""
+        try:
+            # Draw game in background
+            self.draw_game()
+            
+            # Draw pause overlay
+            title = "PAUSED"
+            options = [
+                "P - Resume",
+                "S - Save Game",
+                "Q - Quit to Menu"
+            ]
+            
+            # Draw semi-transparent box
+            box_height = 8
+            box_width = 30
+            start_y = self.height // 2 - box_height // 2
+            start_x = self.width // 2 - box_width // 2
+            
+            for i in range(box_height):
+                self.stdscr.addstr(start_y + i, start_x, " " * box_width, curses.color_pair(5) | curses.A_REVERSE)
+            
+            # Draw text
+            self.stdscr.addstr(start_y + 2, (self.width - len(title)) // 2, title, curses.color_pair(3) | curses.A_BOLD)
+            
+            for i, option in enumerate(options):
+                self.stdscr.addstr(start_y + 4 + i, (self.width - len(option)) // 2, option, curses.color_pair(5))
         except curses.error:
             pass
     
@@ -443,9 +593,14 @@ class Game:
             if key == ord(' '):
                 self.state = GameState.PLAY
                 self.setup_game()
+            elif key in [ord('l'), ord('L')]:
+                if self.load_game():
+                    self.state = GameState.PLAY
         
         elif self.state == GameState.PLAY:
-            if not self.gunner.exploding:
+            if key in [ord('p'), ord('P')]:
+                self.state = GameState.PAUSED
+            elif not self.gunner.exploding:
                 if key in [ord('a'), ord('A'), curses.KEY_LEFT]:
                     self.gunner.x = max(1, self.gunner.x - 2)
                 elif key in [ord('d'), ord('D'), curses.KEY_RIGHT]:
@@ -455,6 +610,15 @@ class Game:
                     if len(self.bullets) < 3:
                         self.bullets.append(Bullet(self.gunner.x + 3, self.height - 4))
         
+        elif self.state == GameState.PAUSED:
+            if key in [ord('p'), ord('P')]:
+                self.state = GameState.PLAY
+            elif key in [ord('s'), ord('S')]:
+                self.save_game()
+            elif key in [ord('q'), ord('Q')]:
+                self.save_game()
+                self.state = GameState.INTRO
+        
         elif self.state == GameState.GAMEOVER:
             if key in [ord('r'), ord('R')]:
                 self.score = 0
@@ -462,7 +626,7 @@ class Game:
                 self.gunner.lives = 3
                 self.state = GameState.INTRO
         
-        if key in [ord('q'), ord('Q')]:
+        if key in [ord('q'), ord('Q')] and self.state != GameState.PAUSED:
             return False
         
         return True
@@ -514,6 +678,9 @@ class Game:
                         self.state = GameState.GAMEOVER
                 
                 self.draw_game()
+            
+            elif self.state == GameState.PAUSED:
+                self.draw_paused()
             
             elif self.state == GameState.GAMEOVER:
                 self.draw_gameover()
