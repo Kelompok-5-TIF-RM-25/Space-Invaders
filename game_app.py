@@ -148,6 +148,15 @@ class GameApp:
             if not any(a.alive for a in self.aliens.aliens):
                 aliens_dead = True
 
+        # Check if we just entered PLAY from WIN (next level triggered)
+        prev_state = getattr(self, '_prev_state', None)
+        if self.game.state == GameState.PLAY and prev_state == GameState.WIN:
+            # Respawn aliens for new level
+            if self.aliens:
+                self.aliens.spawn()
+        
+        self._prev_state = self.game.state
+
         self.game.update(aliens_dead)
 
         if self.game.state == GameState.PLAY:
@@ -291,9 +300,14 @@ class GameApp:
         text = "YOU WIN!" if self.game.state == GameState.WIN else "GAME OVER"
         self.safe_addstr(h // 2 - 2, (w - len(text)) // 2, text, curses.A_BOLD)
 
-        self.safe_addstr(h // 2, (w - 28) // 2, "SPACE : Restart")
-        self.safe_addstr(h // 2 + 1, (w - 10) // 2, "Q : Quit")
-        self.safe_addstr(h // 2 + 2, (w - 18) // 2, "S : Save  L : Load")
+        if self.game.state == GameState.WIN:
+            self.safe_addstr(h // 2, (w - 20) // 2, "N : Next Level")
+            self.safe_addstr(h // 2 + 1, (w - 10) // 2, "S : Save")
+            self.safe_addstr(h // 2 + 2, (w - 10) // 2, "Q : Quit")
+        else:
+            self.safe_addstr(h // 2, (w - 28) // 2, "SPACE : Restart")
+            self.safe_addstr(h // 2 + 1, (w - 10) // 2, "Q : Quit")
+            self.safe_addstr(h // 2 + 2, (w - 18) // 2, "S : Save  L : Load")
 
         status = self.game.get_status()
         if status:

@@ -20,7 +20,7 @@ class GameCore:
         self.alien_y = -5
 
         # Timer
-        self.time_limit = 60
+        self.time_limit = 180
         self.time_left = self.time_limit
         self.last_time = time.time()
 
@@ -74,6 +74,13 @@ class GameCore:
         self.level = 1
         self.state = GameState.PLAY
         self.reset_timer()
+
+    def next_level(self):
+        """Advance to the next level."""
+        self.level += 1
+        self.state = GameState.PLAY
+        self.reset_timer()
+        self.set_status(f"Level {self.level}!")
 
     def save_game(self) -> bool:
         """Save current game state to JSON file.
@@ -162,7 +169,15 @@ class GameCore:
             elif k == "l":
                 self.load_game()
 
-        elif self.state in (GameState.WIN, GameState.GAMEOVER):
+        elif self.state == GameState.WIN:
+            if k == "n":
+                self.next_level()
+            elif k == "s":
+                self.save_game()
+            elif k == "q":
+                self.quit()
+
+        elif self.state == GameState.GAMEOVER:
             if key == " ":
                 self.start_game()
             elif k == "q":
