@@ -203,6 +203,8 @@ class GameApp:
             self.render_intro()
         elif self.game.state == GameState.PLAY:
             self.render_play()
+        elif self.game.state == GameState.PAUSE:
+            self.render_pause()
         elif self.game.state in (GameState.WIN, GameState.GAMEOVER):
             self.render_end()
 
@@ -231,7 +233,7 @@ class GameApp:
             "L     : Load Game" if self.game.has_save else "L     : Load Game (N/A)",
             "Q     : Quit",
             "",
-            "During game: S = Save | L = Load | Q = Quit",
+            "During game: P = Pause | S = Save | L = Load | Q = Quit",
         ]
         my = h // 2
         for i, item in enumerate(menu):
@@ -240,6 +242,23 @@ class GameApp:
         status = self.game.get_status()
         if status:
             self.safe_addstr(h - 2, (w - len(status)) // 2, status, curses.A_BOLD)
+
+    def render_pause(self):
+        """Render pause screen."""
+        # Render game state first (frozen)
+        self.render_play()
+        
+        # Overlay pause menu
+        h, w = self.stdscr.getmaxyx()
+        
+        pause_text = "PAUSED"
+        self.safe_addstr(h // 2 - 2, (w - len(pause_text)) // 2, pause_text, curses.A_BOLD)
+        
+        resume_text = "P : Resume"
+        self.safe_addstr(h // 2, (w - len(resume_text)) // 2, resume_text)
+        
+        quit_text = "Q : Quit"
+        self.safe_addstr(h // 2 + 1, (w - len(quit_text)) // 2, quit_text)
 
     def render_play(self):
         """Render gameplay screen."""
@@ -285,7 +304,7 @@ class GameApp:
         )
         self.safe_addstr(0, 0, info)
 
-        hint = "S=Save  L=Load  Q=Quit"
+        hint = "P=Pause  S=Save  L=Load  Q=Quit"
         self.safe_addstr(1, 0, hint)
 
         status = self.game.get_status()

@@ -140,6 +140,17 @@ class GameCore:
             self.set_status(f"Load failed: {e}")
             return False
 
+    def pause(self):
+        """Pause the game."""
+        if self.state == GameState.PLAY:
+            self.state = GameState.PAUSE
+
+    def resume(self):
+        """Resume the game from pause."""
+        if self.state == GameState.PAUSE:
+            self.state = GameState.PLAY
+            self.last_time = time.time()  # Reset timer to prevent time jump
+
     def quit(self):
         """Quit the game."""
         self.state = GameState.EXIT
@@ -162,12 +173,20 @@ class GameCore:
                 self.quit()
 
         elif self.state == GameState.PLAY:
-            if k == "q":
+            if k == "p":
+                self.pause()
+            elif k == "q":
                 self.quit()
             elif k == "s":
                 self.save_game()
             elif k == "l":
                 self.load_game()
+
+        elif self.state == GameState.PAUSE:
+            if k == "p":
+                self.resume()
+            elif k == "q":
+                self.quit()
 
         elif self.state == GameState.WIN:
             if k == "n":
