@@ -30,6 +30,9 @@ class GameCore:
         self.last_status_msg = ""
         self.last_status_ts = 0.0
 
+        # Flag untuk load
+        self.just_loaded = False
+
     def set_status(self, msg: str, ttl: float = 1.5):
         """Set a status message to display temporarily.
         
@@ -134,6 +137,7 @@ class GameCore:
             self.last_time = time.time()
             self.state = GameState.PLAY
             self.has_save = True
+            self.just_loaded = True
             self.set_status("Loaded ✓")
             return True
         except Exception as e:

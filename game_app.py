@@ -96,6 +96,22 @@ class GameApp:
     def on_enter_play(self):
         """Initialize game entities when entering play state."""
         h, w = self.stdscr.getmaxyx()
+        # Jika baru load, tetap harus inisialisasi player dan aliens agar tidak None
+        if hasattr(self.game, 'just_loaded') and self.game.just_loaded:
+            self.game.just_loaded = False
+            # Inisialisasi aliens dan player seperti new game, tapi tetap lanjut level dsb
+            if self.aliens is None:
+                self.aliens = AlienSystem(w)
+            else:
+                self.aliens.spawn()
+            px = max(1, (w - self.player_w) // 2)
+            py = max(1, h - self.player_h - 1)
+            self.player = Player(
+                x=px,
+                y=py,
+                bullets=[]
+            )
+            return
         if self.aliens is None:
             self.aliens = AlienSystem(w)
         else:
